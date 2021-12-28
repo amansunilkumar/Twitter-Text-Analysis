@@ -1,0 +1,773 @@
+```{r}
+#PROJECT 
+#BY Aman Sunil Kumar
+
+```
+
+```{r}
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidytext)
+library(ggplot2)
+library(tidyr)
+library(igraph)
+library(ggraph)
+library(data.table)
+library("scatterplot3d")
+```
+
+```{r}
+#Creating adjacency matrix
+keyword<-Keyword
+
+v1 <- unique(na.omit(c(keyword$`Keyword 1`)))
+v2 <- unique(na.omit(c(keyword$`Keyword 2`)))
+v3 <- unique(na.omit(c(keyword$`Keyword 3`)))
+v4 <- unique(na.omit(c(keyword$`Keyword 4`)))
+v5 <- unique(na.omit(c(keyword$`Keyword 5`)))
+v6 <- unique(na.omit(c(keyword$`Keyword 6`)))
+v7 <- unique(na.omit(c(keyword$`Keyword 7`)))
+v8 <- unique(na.omit(c(keyword$`Keyword 8`)))
+v9 <- unique(na.omit(c(keyword$`Keyword 9`)))
+v10 <- unique(na.omit(c(keyword$`Keyword 10`)))
+v11 <- unique(na.omit(c(keyword$`Keyword 11`)))
+v12 <- unique(na.omit(c(keyword$`Keyword 12`)))
+
+keywords <- c(v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12)
+keywords <- unique(keywords)
+r <- length(keywords)
+df_key <- data.frame(Keyword = keywords)
+adj_matrix <- matrix(0,r,r)
+rownames(adj_matrix) <- keywords
+colnames(adj_matrix) <- keywords
+for(i in 1:(nrow(df_key)-1)){
+  l=i+1
+  while(l <= nrow(df_key)){
+    c <- 0
+    for(j in 3:nrow(keyword)){
+      k <- 2
+      a <- 1
+      b <- 1
+      while(k<=ncol(keyword) & a==1){
+        if(is.na(keyword[j,k])==FALSE){
+          if (df_key[i,1]==keyword[j,k]){
+            a <- 0
+          }
+          else{
+            k=k+1
+          }
+        }
+        else{
+          k=k+1
+        }
+      }
+      m <- 2
+      while(m <= ncol(keyword) & b==1){
+        if(is.na(keyword[j,m])==FALSE){
+          if(df_key[l,1]==keyword[j,m]){
+            b <- 0
+          }
+          else{
+            m=m+1
+          }
+        }
+        else{
+          m=m+1
+        }
+      }
+      if(a==0 & b==0){
+        c <- c + 1
+      }
+    }
+    adj_matrix[i,l] <- c
+    adj_matrix[l,i] <- c
+    
+    l= l+1
+  }
+}
+adj_matrix
+```
+
+```{r}
+#TASK1
+net1<-graph_from_adjacency_matrix(adj_matrix,mode="undirected",weighted = T)
+deg<-degree(net1, mode="all")
+View(deg)
+str<-strength(net1, mode="all")
+View(str)
+#top 10 nodes by degree
+degsort <-sort.int(deg, decreasing=TRUE, index.return=FALSE)
+View(degsort)
+topdegree<-head(degsort, 10)
+View(topdegree)
+#top 10 nodes by strength
+strsort<-sort.int(str, decreasing=TRUE, index.return=FALSE)
+View(strsort)
+topstrength<-head(strsort, 10)
+View(topstrength)
+#top 10 node pairs by weight
+pair<- as_data_frame(net1, what="edges")
+pair<-tail(pair[order(pair$weight),],10)
+View(pair)
+#Plotting Node degree vs strength
+plot(deg, str, main="Scatterplot",
+     xlab="Node Degree ", ylab=" Node Strength ")
+```
+
+```{r}
+#TASK2
+df_2017<-X2017%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)
+df_2017
+```
+
+```{r}
+df_2017<-df_2017%>%
+  anti_join(stop_words,by="word")
+df_2017
+
+```
+
+```{r}
+df_2017_head <- head(df_2017,10)
+df_2017_head
+```
+
+```{r}
+df_2017$total<-sum(df_2017$n)
+
+df_2017<-df_2017%>%
+  mutate(rank=row_number(),`term frequency`= n/total)
+df_2017
+```
+
+```{r}
+ggplot(df_2017, aes(`term frequency`, fill = word)) +
+  geom_histogram(colour="Black",show.legend = FALSE) +
+  xlim(NA, 0.0009) 
+```
+
+```{r}
+df_2017_2<-X2017%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)%>%
+  anti_join(stop_words,by="word")
+
+df_2017_2$total<-sum(df_2017_2$n)
+
+
+```
+
+```{r}
+freq_by_rank <- df_2017_2%>%
+  mutate(rank=row_number(),`term frequency`= n/total)
+
+```
+
+```{r}
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+```{r}
+rank_subset <- freq_by_rank %>% 
+  filter(rank < 2000,
+         rank > 0)
+```
+
+```{r}
+lm(log10(`term frequency`) ~ log10(rank), data = rank_subset)
+
+```
+
+```{r}
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`)) + 
+  geom_abline(intercept = -1.5007, slope = -0.7532, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+
+```{r}
+df_2017_bigrams <- X2017 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+```
+
+```{r}
+df_2017_bigrams<-df_2017_bigrams %>%
+  count(bigram,sort=TRUE)
+```
+
+```{r}
+df_2017_bigrams_separated <- df_2017_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+```
+
+```{r}
+df_2017_bigrams_filtered <- df_2017_bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+df_2017_bigrams_filtered
+```
+
+
+
+
+```{r}
+bigram_graph <- df_2017_bigrams_filtered %>%
+    filter(n>5)%>%
+  graph_from_data_frame()
+bigram_graph
+```
+
+```{r}
+set.seed(2017)
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+```
+
+```{r}
+set.seed(2020)
+``
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+```{r}
+df_2018<-X2018%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)
+df_2018
+```
+
+```{r}
+df_2018<-df_2018%>%
+  anti_join(stop_words,by="word")
+df_2018
+```
+```{r}
+df_2018_head <- head(df_2018,10)
+df_2018_head
+```
+
+```{r}
+df_2018$total<-sum(df_2018$n)
+
+df_2018<-df_2018%>%
+  mutate(rank_2018=row_number(),`term frequency_2018`= n/total)
+df_2018
+```
+```{r}
+ggplot(df_2018, aes(`term frequency_2018`, fill = word)) +
+  geom_histogram(colour="Black",show.legend = FALSE) +
+  xlim(NA, 0.0009) 
+```
+
+```{r}
+df_2018_2<-X2018%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)%>%
+  anti_join(stop_words,by="word")
+
+df_2018_2$total<-sum(df_2018_2$n)
+
+
+```
+
+```{r}
+freq_by_rank_2018 <- df_2018_2%>%
+  mutate(rank_2018=row_number(),`term frequency_2018`= n/total)
+```
+
+```{r}
+freq_by_rank_2018 %>% 
+  ggplot(aes(rank_2018, `term frequency_2018`)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+
+```{r}
+rank_subset_2018 <- freq_by_rank_2018 %>% 
+  filter(rank_2018 < 2000,
+         rank_2018 > 0)
+```
+
+
+```{r}
+lm(log10(`term frequency_2018`) ~ log10(rank_2018), data = rank_subset_2018)
+
+```
+```{r}
+freq_by_rank_2018 %>% 
+  ggplot(aes(rank_2018, `term frequency_2018`)) + 
+  geom_abline(intercept = -1.5516, slope = -0.7256, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+df_2018_bigrams <- X2018 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+```
+
+```{r}
+df_2018_bigrams<-df_2018_bigrams %>%
+  count(bigram,sort=TRUE)
+```
+
+```{r}
+df_2018_bigrams_separated <- df_2018_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+```
+
+```{r}
+df_2018_bigrams_filtered <- df_2018_bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+df_2018_bigrams_filtered
+```
+
+```{r}
+bigram_graph_2018 <- df_2018_bigrams_filtered %>%
+    filter(n>8)%>%
+  graph_from_data_frame()
+bigram_graph_2018
+```
+
+```{r}
+set.seed(2017)
+
+ggraph(bigram_graph_2018, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+```{r}
+set.seed(2020)
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph_2018, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+```{r}
+df_2019<-X2019%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)
+df_2019
+```
+
+```{r}
+df_2019<-df_2019%>%
+  anti_join(stop_words,by="word")
+df_2019
+```
+```{r}
+df_2019_head <- head(df_2019,10)
+df_2019_head
+```
+
+```{r}
+df_2019$total<-sum(df_2019$n)
+
+df_2019<-df_2019%>%
+  mutate(rank_2019=row_number(),`term frequency_2019`= n/total)
+df_2019
+```
+```{r}
+ggplot(df_2019, aes(`term frequency_201`, fill = word)) +
+  geom_histogram(colour="Black",show.legend = FALSE) +
+  xlim(NA, 0.0009) 
+```
+
+```{r}
+df_2019_2<-X2019%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)%>%
+  anti_join(stop_words,by="word")
+
+df_2019_2$total<-sum(df_2019_2$n)
+
+
+```
+
+```{r}
+freq_by_rank_2019 <- df_2019_2%>%
+  mutate(rank_2019=row_number(),`term frequency_2019`= n/total)
+```
+
+```{r}
+
+```
+
+```{r}
+freq_by_rank_2019 %>% 
+  ggplot(aes(rank_2019, `term frequency_2019`)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+
+```{r}
+rank_subset_2019 <- freq_by_rank_2019 %>% 
+  filter(rank_2019 < 5000,
+         rank_2019 > 0)
+```
+
+
+```{r}
+lm(log10(`term frequency_2019`) ~ log10(rank_2019), data = rank_subset_2019)
+
+```
+```{r}
+freq_by_rank_2019 %>% 
+  ggplot(aes(rank_2019, `term frequency_2019`)) + 
+  geom_abline(intercept = -1.1476, slope = -0.8935, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+df_2019_bigrams <- X2019 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+```
+
+```{r}
+df_2019_bigrams<-df_2019_bigrams %>%
+  count(bigram,sort=TRUE)
+```
+
+```{r}
+df_2019_bigrams_separated <- df_2019_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+```
+
+```{r}
+df_2019_bigrams_filtered <- df_2019_bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+df_2019_bigrams_filtered
+```
+
+```{r}
+bigram_graph_2019 <- df_2019_bigrams_filtered %>%
+    filter(n>20)%>%
+  graph_from_data_frame()
+bigram_graph_2019
+```
+
+```{r}
+set.seed(2017)
+
+ggraph(bigram_graph_2019, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+```{r}
+set.seed(2020)
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph_2019, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+
+
+
+```{r}
+df_2020<-X2020%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)
+df_2020
+```
+
+```{r}
+df_2020<-df_2020%>%
+  anti_join(stop_words,by="word")
+df_2020
+```
+```{r}
+df_2020_head <- head(df_2020,10)
+df_2020_head
+```
+
+```{r}
+df_2020$total<-sum(df_2020$n)
+
+df_2020<-df_2020%>%
+  mutate(rank_2020=row_number(),`term frequency_2020`= n/total)
+df_2020
+```
+
+```{r}
+ggplot(df_2020, aes(`term frequency_2020`, fill = word)) +
+  geom_histogram(colour="Black",show.legend = FALSE) +
+  xlim(NA, 0.0009) 
+```
+
+```{r}
+df_2020_2<-X2020%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)%>%
+  anti_join(stop_words,by="word")
+
+df_2020_2$total<-sum(df_2020_2$n)
+
+
+```
+
+```{r}
+freq_by_rank_2020 <- df_2020_2%>%
+  mutate(rank_2020=row_number(),`term frequency_2020`= n/total)
+```
+
+```{r}
+freq_by_rank_2020 %>% 
+  ggplot(aes(rank_2020, `term frequency_2020`)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+rank_subset_2020 <- freq_by_rank_2020 %>% 
+  filter(rank_2020 < 10000,
+         rank_2020 > 0)
+```
+
+
+```{r}
+lm(log10(`term frequency_2020`) ~ log10(rank_2020), data = rank_subset_2020)
+
+```
+
+
+
+```{r}
+freq_by_rank_2020 %>% 
+  ggplot(aes(rank_2020, `term frequency_2020`)) + 
+  geom_abline(intercept = -0.7245, slope = -1.0357, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+df_2020_bigrams <- X2020 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+```
+
+```{r}
+df_2020_bigrams<-df_2020_bigrams %>%
+  count(bigram,sort=TRUE)
+```
+
+```{r}
+df_2020_bigrams_separated <- df_2020_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+```
+
+```{r}
+df_2020_bigrams_filtered <- df_2020_bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+df_2020_bigrams_filtered
+```
+
+```{r}
+bigram_graph_2020 <- df_2020_bigrams_filtered %>%
+    filter(n>20)%>%
+  graph_from_data_frame()
+bigram_graph_2020
+```
+
+```{r}
+set.seed(2017)
+
+ggraph(bigram_graph_2020, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+```{r}
+set.seed(2020)
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph_2020, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+```
+
+
+```{r}
+df_2021<-X2021%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)
+df_2021
+```
+
+
+```{r}
+df_2021<-df_2021%>%
+  anti_join(stop_words,by="word")
+df_2021
+```
+```{r}
+df_2021_head <- head(df_2021,10)
+df_2021_head
+```
+
+```{r}
+df_2021$total<-sum(df_2021$n)
+
+df_2021<-df_2021%>%
+  mutate(rank_2021=row_number(),`term frequency_2021`= n/total)
+df_2021
+```
+
+```{r}
+ggplot(df_2021, aes(`term frequency_2021`, fill = word)) +
+  geom_histogram(colour="Black",show.legend = FALSE) +
+  xlim(NA, 0.0009) 
+```
+
+```{r}
+df_2021_2<-X2021%>%
+ unnest_tokens(word,tweet)%>%
+  count(word, sort = TRUE)%>%
+  anti_join(stop_words,by="word")
+
+df_2021_2$total<-sum(df_2021_2$n)
+
+
+```
+
+```{r}
+freq_by_rank_2021 <- df_2021_2%>%
+  mutate(rank_2021=row_number(),`term frequency_2021`= n/total)
+```
+
+```{r}
+freq_by_rank_2021 %>% 
+  ggplot(aes(rank_2021, `term frequency_2021`)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = TRUE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+rank_subset_2021 <- freq_by_rank_2021 %>% 
+  filter(rank_2021 < 10000,
+         rank_2021 > 0)
+```
+
+
+```{r}
+lm(log10(`term frequency_2021`) ~ log10(rank_2021), data = rank_subset_2021)
+
+```
+
+
+
+```{r}
+freq_by_rank_2021 %>% 
+  ggplot(aes(rank_2021, `term frequency_2021`)) + 
+  geom_abline(intercept = -0.7211, slope = -1.0372, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+df_2021_bigrams <- X2021 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+```
+
+```{r}
+df_2021_bigrams<-df_2021_bigrams %>%
+  count(bigram,sort=TRUE)
+```
+
+```{r}
+df_2021_bigrams_separated <- df_2021_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+```
+
+```{r}
+df_2021_bigrams_filtered <- df_2021_bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+df_2021_bigrams_filtered
+```
+
+```{r}
+bigram_graph_2021 <- df_2021_bigrams_filtered %>%
+    filter(n>20)%>%
+  graph_from_data_frame()
+bigram_graph_2021
+```
+
+```{r}
+set.seed(2017)
+
+ggraph(bigram_graph_2021, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+```{r}
+set.seed(2020)
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph_2021, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
